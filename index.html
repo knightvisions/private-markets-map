@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Private Markets Infrastructure Map</title>
+  <meta name="description" content="Interactive market map of private markets infrastructure: cap tables, fund admin, SPVs, secondaries, LP portals, forward contracts, broker-dealers, data & compliance." />
+  <meta property="og:title" content="Private Markets Infrastructure Map" />
+  <meta property="og:description" content="Explore 100+ companies across the private markets software stack on a 2D grid by category and customer type." />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #07090f;
+      --fg: #e8eaf0;
+      --surface: #0e121b;
+      --surface-2: #151b28;
+      --border: #243044;
+      --muted: #8b95a8;
+      --accent: #5b8def;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(91,141,239,.12), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 0%, rgba(139,92,246,.1), transparent);
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #2a3548; border-radius: 4px; }
+
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+    header {
+      position: sticky; top: 0; z-index: 20;
+      border-bottom: 1px solid var(--border);
+      background: rgba(7,9,15,.85);
+      backdrop-filter: blur(12px);
+    }
+    .header-main {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 12px 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: linear-gradient(135deg, #5b8def, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; color: #fff;
+      box-shadow: 0 4px 12px rgba(30,60,150,.35);
+    }
+    h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+    .subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .seg {
+      display: flex; gap: 2px; padding: 2px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+    }
+    .seg button, .chip-btn, .filter-btn, .company-chip, .modal-btn, .competitor-btn {
+      font-family: inherit; cursor: pointer; border: none; background: none; color: inherit;
+    }
+    .seg button {
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      color: var(--muted);
+    }
+    .seg button.active { background: var(--surface-2); color: var(--fg); }
+    .count-badge {
+      border: 1px solid var(--border); background: var(--surface);
+      border-radius: 8px; padding: 6px 12px; font-size: 12px; color: var(--muted);
+    }
+    .count-badge strong { color: var(--fg); }
+
+    .legend {
+      display: flex; gap: 12px; overflow-x: auto; padding: 8px 24px;
+      border-top: 1px solid rgba(36,48,68,.6);
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--muted); white-space: nowrap; flex-shrink: 0;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    .body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+    aside {
+      width: 288px; flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      background: rgba(14,18,27,.95);
+      display: flex; flex-direction: column;
+      max-height: calc(100vh - 90px);
+      position: sticky; top: 90px;
+    }
+    .aside-head {
+      padding: 16px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .aside-head h2 {
+      font-size: 12px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .clear-btn { font-size: 12px; color: var(--accent); cursor: pointer; background: none; border: none; font-family: inherit; }
+    .clear-btn:hover { text-decoration: underline; }
+    .showing { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .showing span { color: var(--fg); font-weight: 500; }
+    .aside-body { flex: 1; overflow-y: auto; padding: 16px; }
+    .aside-foot {
+      border-top: 1px solid var(--border); padding: 12px;
+      font-size: 10px; line-height: 1.5; color: var(--muted);
+    }
+    .filter-group { margin-bottom: 24px; }
+    .filter-label {
+      font-size: 11px; font-weight: 500; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: block;
+    }
+    input[type="search"] {
+      width: 100%; padding: 8px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--fg); font-size: 13px; font-family: inherit; outline: none;
+    }
+    input[type="search"]:focus { border-color: var(--accent); }
+    input[type="search"]::placeholder { color: rgba(139,149,168,.6); }
+
+    .cat-list { display: flex; flex-direction: column; gap: 4px; }
+    .cat-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: 6px; font-size: 12px;
+      color: var(--muted); text-align: left; width: 100%;
+      cursor: pointer; background: none; border: none; font-family: inherit;
+    }
+    .cat-item:hover { background: rgba(21,27,40,.6); color: var(--fg); }
+    .cat-item.active { background: var(--surface-2); color: var(--fg); }
+    .cat-item .check { margin-left: auto; font-size: 10px; color: var(--accent); }
+
+    .ct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .ct-btn {
+      padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+      background: transparent; font-family: inherit;
+    }
+    .ct-btn.active { border-color: transparent; color: #fff; }
+
+    .stage-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+    .stage-btn {
+      padding: 4px 10px; border-radius: 999px; font-size: 11px;
+      border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+      background: transparent; font-family: inherit;
+    }
+    .stage-btn.active {
+      border-color: rgba(91,141,239,.5); background: rgba(91,141,239,.15); color: var(--accent);
+    }
+    .hint { font-size: 10px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+
+    main { flex: 1; min-width: 0; overflow: auto; display: flex; flex-direction: column; }
+    .map-wrap { padding: 20px 24px; min-width: 720px; }
+    .map-grid-header, .map-row {
+      display: grid;
+      grid-template-columns: 160px repeat(4, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .map-grid-header { margin-bottom: 8px; }
+    .map-rows { display: flex; flex-direction: column; gap: 8px; }
+    .col-head, .row-label {
+      display: flex; align-items: center; gap: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+      border-radius: 8px; padding: 10px 12px;
+    }
+    .col-head { justify-content: center; }
+    .col-head span, .row-label span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .row-label span { text-transform: none; font-weight: 500; line-height: 1.25; }
+    .cell {
+      min-height: 88px; border: 1px solid rgba(36,48,68,.8);
+      background: rgba(14,18,27,.4); border-radius: 8px; padding: 6px;
+    }
+    .cell-empty {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 72px; color: rgba(139,149,168,.35); font-size: 10px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; align-content: start; }
+    .company-chip {
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      border: 1px solid rgba(36,48,68,.6); background: var(--surface-2);
+      border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 500;
+      text-align: left; border-left-width: 3px;
+      transition: transform .15s, box-shadow .15s, border-color .15s;
+    }
+    .company-chip:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.35);
+      border-color: rgba(91,141,239,.5);
+    }
+    .map-note { margin-top: 16px; font-size: 11px; color: var(--muted); }
+
+    .list-wrap {
+      padding: 20px 24px;
+      display: grid; gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      max-width: 1100px;
+    }
+    .list-card {
+      border: 1px solid var(--border); background: var(--surface);
+      border-radius: 12px; padding: 16px; text-align: left; cursor: pointer;
+      border-left-width: 3px; transition: border-color .15s, transform .15s;
+      font-family: inherit; color: inherit;
+    }
+    .list-card:hover { border-color: rgba(91,141,239,.5); transform: translateY(-1px); }
+    .list-card h3 { font-size: 15px; font-weight: 600; }
+    .list-card .meta { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+    .list-card .stage {
+      font-size: 10px; border: 1px solid var(--border); border-radius: 999px;
+      padding: 2px 8px; color: var(--muted); flex-shrink: 0;
+    }
+    .list-card p { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.45;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+    .tag { font-size: 10px; background: var(--surface-2); color: var(--muted); padding: 2px 6px; border-radius: 4px; }
+    .tag.ct { color: rgba(255,255,255,.9); }
+
+    .empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 48px; color: var(--muted);
+    }
+    .empty strong { display: block; color: var(--fg); font-size: 18px; margin-bottom: 4px; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 16px;
+    }
+    .modal {
+      position: relative; width: 100%; max-width: 512px; max-height: 90vh;
+      overflow-y: auto; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,.5);
+      animation: scaleIn .2s ease-out;
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-accent { height: 6px; border-radius: 16px 16px 0 0; }
+    .modal-body { padding: 24px; }
+    .modal-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+    .modal-cat { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+    .modal h2 { font-size: 24px; font-weight: 600; letter-spacing: -.02em; margin-top: 4px; }
+    .close-x {
+      border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px;
+      color: var(--muted); font-size: 14px; cursor: pointer; background: none;
+    }
+    .close-x:hover { background: var(--surface-2); color: var(--fg); }
+    .one-liner { margin-top: 12px; font-size: 14px; line-height: 1.55; color: rgba(232,234,240,.9); }
+    .section { margin-top: 20px; }
+    .section h3 {
+      font-size: 11px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    }
+    .section p { font-size: 13px; line-height: 1.55; color: var(--muted); }
+    .funding-pill {
+      display: inline-flex; border-radius: 999px; padding: 4px 12px;
+      font-size: 12px; font-weight: 500;
+      border: 1px solid rgba(91,141,239,.4); background: rgba(91,141,239,.1); color: var(--accent);
+    }
+    .founded { margin-left: 8px; font-size: 12px; color: var(--muted); }
+    .ct-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ct-pill { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; color: #fff; }
+    .comp-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .competitor-btn {
+      border: 1px solid var(--border); background: var(--surface-2);
+      border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500;
+    }
+    .competitor-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .modal-actions { display: flex; gap: 8px; margin-top: 24px; }
+    .modal-actions a, .modal-actions button {
+      flex: 1; text-align: center; padding: 10px 16px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; text-decoration: none; font-family: inherit; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border: none; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-secondary {
+      flex: 0 0 auto !important; border: 1px solid var(--border);
+      background: transparent; color: var(--muted);
+    }
+    .btn-secondary:hover { background: var(--surface-2); color: var(--fg); }
+
+    .mobile-filters {
+      display: none; position: fixed; bottom: 16px; right: 16px; z-index: 40;
+      background: var(--accent); color: #fff; border: none; border-radius: 999px;
+      padding: 12px 20px; font-size: 13px; font-weight: 600; font-family: inherit;
+      box-shadow: 0 8px 24px rgba(30,60,150,.4); cursor: pointer;
+    }
+    .mobile-view { display: none; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); }
+    .mobile-view button {
+      flex: 1; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      background: none; border: none; color: var(--muted); font-family: inherit; cursor: pointer;
+    }
+    .mobile-view button.active { background: var(--surface-2); color: var(--fg); }
+    .overlay-bg {
+      display: none; position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.5);
+    }
+    .overlay-bg.open { display: block; }
+
+    @media (max-width: 900px) {
+      aside {
+        position: fixed; inset: 0 auto 0 0; z-index: 30; max-height: 100vh;
+        transform: translateX(-100%); transition: transform .2s;
+      }
+      aside.open { transform: translateX(0); }
+      .mobile-filters { display: block; }
+      .mobile-view { display: flex; }
+      .seg.desktop { display: none !important; }
+      .header-main { padding: 12px 16px; }
+      .map-wrap { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app"></div>
+  <script src="data.js"></script>
+  <script>
+    const CATEGORIES = [
+      "Cap Table Management",
+      "Fund Administration",
+      "SPV Formation",
+      "Secondary Marketplaces",
+      "LP Portals & IR",
+      "Forward Contracts & Liquidity",
+      "Broker-Dealers",
+      "Data & Analytics",
+      "Compliance & Onboarding",
+      "Portfolio Management",
+      "Fundraising Infrastructure",
+    ];
+    const CUSTOMER_TYPES = ["GP", "LP", "Company", "Employee"];
+    const FUNDING_STAGES = ["Bootstrapped", "Seed", "Series A", "Series B", "Series C+", "Public", "Acquired", "Private"];
+    const CATEGORY_COLORS = {
+      "Cap Table Management": "#3b82f6",
+      "Fund Administration": "#8b5cf6",
+      "SPV Formation": "#06b6d4",
+      "Secondary Marketplaces": "#f59e0b",
+      "LP Portals & IR": "#10b981",
+      "Forward Contracts & Liquidity": "#ec4899",
+      "Broker-Dealers": "#ef4444",
+      "Data & Analytics": "#6366f1",
+      "Compliance & Onboarding": "#14b8a6",
+      "Portfolio Management": "#a855f7",
+      "Fundraising Infrastructure": "#f97316",
+    };
+    const CUSTOMER_COLORS = { GP: "#8b5cf6", LP: "#06b6d4", Company: "#3b82f6", Employee: "#f59e0b" };
+
+    const companies = window.COMPANIES || [];
+    const byId = Object.fromEntries(companies.map(c => [c.id, c]));
+
+    const state = {
+      categories: [],
+      customerTypes: [],
+      fundingStages: [],
+      search: "",
+      view: "map",
+      selected: null,
+      sidebarOpen: false,
+    };
+
+    function toggle(list, item) {
+      return list.includes(item) ? list.filter(x => x !== item) : [...list, item];
+    }
+
+    function filtered() {
+      const q = state.search.trim().toLowerCase();
+      return companies.filter(c => {
+        if (state.categories.length && !state.categories.includes(c.category)) return false;
+        if (state.customerTypes.length && !c.customerTypes.some(t => state.customerTypes.includes(t))) return false;
+        if (state.fundingStages.length && !state.fundingStages.includes(c.fundingStage)) return false;
+        if (q) {
+          const hay = [c.name, c.oneLiner, c.businessModel, c.category, c.hq || ""].join(" ").toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function categoryCounts() {
+      const m = {};
+      for (const c of companies) m[c.category] = (m[c.category] || 0) + 1;
+      return m;
+    }
+
+    function render() {
+      const list = filtered();
+      const counts = categoryCounts();
+      const hasFilters = state.categories.length || state.customerTypes.length || state.fundingStages.length || state.search;
+
+      document.getElementById("app").innerHTML = `
+        <header>
+          <div class="header-main">
+            <div class="brand">
+              <div class="logo">PM</div>
+              <div>
+                <h1>Private Markets Infrastructure Map</h1>
+                <p class="subtitle">Cap tables · Fund admin · SPVs · Secondaries · LP portals · Liquidity · Compliance</p>
+              </div>
+            </div>
+            <div class="header-actions">
+              <div class="seg desktop">
+                <button type="button" data-view="map" class="${state.view === "map" ? "active" : ""}">2D Map</button>
+                <button type="button" data-view="list" class="${state.view === "list" ? "active" : ""}">List</button>
+              </div>
+              <div class="count-badge"><strong>${companies.length}</strong> companies</div>
+            </div>
+          </div>
+          <div class="legend">
+            ${CATEGORIES.map(cat => `
+              <div class="legend-item">
+                <span class="dot" style="background:${CATEGORY_COLORS[cat]}"></span>
+                <span>${esc(cat.split(" ")[0])} <span style="opacity:.6">(${counts[cat] || 0})</span></span>
+              </div>
+            `).join("")}
+          </div>
+        </header>
+
+        <div class="body">
+          <div class="overlay-bg ${state.sidebarOpen ? "open" : ""}" data-close-sidebar></div>
+          <aside class="${state.sidebarOpen ? "open" : ""}">
+            <div class="aside-head">
+              <div>
+                <h2>Filters</h2>
+                <p class="showing">Showing <span>${list.length}</span> of ${companies.length} companies</p>
+              </div>
+              ${hasFilters ? `<button type="button" class="clear-btn" data-clear>Clear all</button>` : ""}
+            </div>
+            <div class="aside-body">
+              <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input type="search" id="search" placeholder="Company name or keyword…" value="${esc(state.search)}" />
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Category</label>
+                <div class="cat-list">
+                  ${CATEGORIES.map(cat => {
+                    const active = state.categories.includes(cat);
+                    return `<button type="button" class="cat-item ${active ? "active" : ""}" data-cat="${esc(cat)}">
+                      <span class="dot" style="background:${CATEGORY_COLORS[cat]};opacity:${active || !state.categories.length ? 1 : 0.4}"></span>
+                      <span style="line-height:1.3">${esc(cat)}</span>
+                      ${active ? '<span class="check">✓</span>' : ""}
+                    </button>`;
+                  }).join("")}
+                </div>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Customer type</label>
+                <div class="ct-grid">
+                  ${CUSTOMER_TYPES.map(ct => {
+                    const active = state.customerTypes.includes(ct);
+                    return `<button type="button" class="ct-btn ${active ? "active" : ""}" data-ct="${ct}"
+                      style="${active ? `background:${CUSTOMER_COLORS[ct]}` : ""}">${ct}</button>`;
+                  }).join("")}
+                </div>
+                <p class="hint">GP = fund managers · LP = limited partners · Company = issuers · Employee = shareholders/staff</p>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Funding stage</label>
+                <div class="stage-wrap">
+                  ${FUNDING_STAGES.map(s => {
+                    const active = state.fundingStages.includes(s);
+                    return `<button type="button" class="stage-btn ${active ? "active" : ""}" data-stage="${esc(s)}">${esc(s)}</button>`;
+                  }).join("")}
+                </div>
+              </div>
+            </div>
+            <div class="aside-foot">
+              Data compiled from public sources including Crunchbase coverage, YC directory, company sites, and private-markets VC portfolio mappings. Best-effort as of 2026 — not investment advice.
+            </div>
+          </aside>
+
+          <main>
+            <div class="mobile-view">
+              <button type="button" data-view="map" class="${state.view === "map" ? "active" : ""}">2D Map</button>
+              <button type="button" data-view="list" class="${state.view === "list" ? "active" : ""}">List</button>
+            </div>
+            ${list.length === 0
+              ? `<div class="empty"><div><strong>No companies match</strong>Try clearing filters or adjusting your search.</div></div>`
+              : state.view === "map" ? renderMap(list) : renderList(list)
+            }
+          </main>
+        </div>
+
+        <button type="button" class="mobile-filters" data-toggle-sidebar>${state.sidebarOpen ? "Close filters" : "Filters"}</button>
+        ${state.selected ? renderModal(state.selected) : ""}
+      `;
+
+      bindEvents();
+    }
+
+    function renderMap(list) {
+      const activeCats = CATEGORIES.filter(cat => list.some(c => c.category === cat));
+      return `<div class="map-wrap">
+        <div class="map-grid-header">
+          <div></div>
+          ${CUSTOMER_TYPES.map(ct => `
+            <div class="col-head">
+              <span class="dot" style="background:${CUSTOMER_COLORS[ct]}"></span>
+              <span>${ct}</span>
+            </div>
+          `).join("")}
+        </div>
+        <div class="map-rows">
+          ${activeCats.map(cat => `
+            <div class="map-row">
+              <div class="row-label">
+                <span class="dot" style="background:${CATEGORY_COLORS[cat]}"></span>
+                <span>${esc(cat)}</span>
+              </div>
+              ${CUSTOMER_TYPES.map(ct => {
+                const cell = list.filter(c => c.category === cat && c.customerTypes.includes(ct));
+                return `<div class="cell">${
+                  cell.length === 0
+                    ? `<div class="cell-empty">—</div>`
+                    : `<div class="chips">${cell.map(c => `
+                        <button type="button" class="company-chip" data-open="${c.id}" title="${esc(c.oneLiner)}"
+                          style="border-left-color:${CATEGORY_COLORS[cat]}">${esc(c.name)}</button>
+                      `).join("")}</div>`
+                }</div>`;
+              }).join("")}
+            </div>
+          `).join("")}
+        </div>
+        <p class="map-note">Companies serving multiple customer types appear in each applicable column. Click a company for full profile.</p>
+      </div>`;
+    }
+
+    function renderList(list) {
+      const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name));
+      return `<div class="list-wrap">
+        ${sorted.map(c => `
+          <button type="button" class="list-card" data-open="${c.id}" style="border-left-color:${CATEGORY_COLORS[c.category]}">
+            <div class="meta">
+              <h3>${esc(c.name)}</h3>
+              <span class="stage">${esc(c.fundingStage)}</span>
+            </div>
+            <p>${esc(c.oneLiner)}</p>
+            <div class="tags">
+              <span class="tag">${esc(c.category)}</span>
+              ${c.customerTypes.map(t => `<span class="tag ct" style="background:${CATEGORY_COLORS[c.category]}">${t}</span>`).join("")}
+            </div>
+          </button>
+        `).join("")}
+      </div>`;
+    }
+
+    function renderModal(company) {
+      const color = CATEGORY_COLORS[company.category];
+      const competitors = (company.competitors || []).map(id => byId[id]).filter(Boolean);
+      return `
+        <div class="modal-overlay" data-close-modal>
+          <div class="modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+            <div class="modal-accent" style="background:${color}"></div>
+            <div class="modal-body">
+              <div class="modal-top">
+                <div>
+                  <p class="modal-cat">${esc(company.category)}</p>
+                  <h2>${esc(company.name)}</h2>
+                </div>
+                <button type="button" class="close-x" data-close-modal aria-label="Close">✕</button>
+              </div>
+              <p class="one-liner">${esc(company.oneLiner)}</p>
+              <div class="section">
+                <h3>Business model</h3>
+                <p>${esc(company.businessModel)}</p>
+              </div>
+              <div class="section">
+                <h3>Funding status</h3>
+                <span class="funding-pill">${esc(company.fundingStage)}</span>
+                ${company.founded ? `<span class="founded">Founded ${company.founded}${company.hq ? " · " + esc(company.hq) : ""}</span>` : ""}
+              </div>
+              <div class="section">
+                <h3>Customer type</h3>
+                <div class="ct-pills">
+                  ${company.customerTypes.map(ct => `
+                    <span class="ct-pill" style="background:${CUSTOMER_COLORS[ct]}">${ct}</span>
+                  `).join("")}
+                </div>
+              </div>
+              <div class="section">
+                <h3>Competitors</h3>
+                ${competitors.length === 0
+                  ? `<p>No mapped competitors in universe.</p>`
+                  : `<div class="comp-list">${competitors.map(c => `
+                      <button type="button" class="competitor-btn" data-open="${c.id}">${esc(c.name)}</button>
+                    `).join("")}</div>`
+                }
+              </div>
+              ${company.sources && company.sources.length ? `
+                <div class="section">
+                  <h3>Discovery sources</h3>
+                  <p style="font-size:12px">${esc(company.sources.join(" · "))}</p>
+                </div>
+              ` : ""}
+              <div class="modal-actions">
+                <a class="btn-primary" href="${esc(company.website)}" target="_blank" rel="noopener noreferrer">Visit website ↗</a>
+                <button type="button" class="btn-secondary" data-close-modal>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindEvents() {
+      document.querySelectorAll("[data-view]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.view = el.getAttribute("data-view");
+          render();
+        });
+      });
+
+      const search = document.getElementById("search");
+      if (search) {
+        search.addEventListener("input", (e) => {
+          state.search = e.target.value;
+          // debounce-ish: re-render but restore focus
+          const pos = e.target.selectionStart;
+          render();
+          const s2 = document.getElementById("search");
+          if (s2) { s2.focus(); s2.setSelectionRange(pos, pos); }
+        });
+      }
+
+      document.querySelectorAll("[data-cat]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.categories = toggle(state.categories, el.getAttribute("data-cat"));
+          render();
+        });
+      });
+      document.querySelectorAll("[data-ct]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.customerTypes = toggle(state.customerTypes, el.getAttribute("data-ct"));
+          render();
+        });
+      });
+      document.querySelectorAll("[data-stage]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.fundingStages = toggle(state.fundingStages, el.getAttribute("data-stage"));
+          render();
+        });
+      });
+      document.querySelectorAll("[data-clear]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.categories = [];
+          state.customerTypes = [];
+          state.fundingStages = [];
+          state.search = "";
+          render();
+        });
+      });
+      document.querySelectorAll("[data-open]").forEach(el => {
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const c = byId[el.getAttribute("data-open")];
+          if (c) { state.selected = c; render(); }
+        });
+      });
+      document.querySelectorAll("[data-close-modal]").forEach(el => {
+        el.addEventListener("click", () => { state.selected = null; render(); });
+      });
+      document.querySelectorAll("[data-toggle-sidebar]").forEach(el => {
+        el.addEventListener("click", () => { state.sidebarOpen = !state.sidebarOpen; render(); });
+      });
+      document.querySelectorAll("[data-close-sidebar]").forEach(el => {
+        el.addEventListener("click", () => { state.sidebarOpen = false; render(); });
+      });
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && state.selected) {
+        state.selected = null;
+        render();
+      }
+    });
+
+    if (!companies.length) {
+      document.getElementById("app").innerHTML = `<div class="empty"><div><strong>Failed to load company data</strong>Ensure data.js is present.</div></div>`;
+    } else {
+      render();
+    }
+  </script>
+</body>
+</html>
